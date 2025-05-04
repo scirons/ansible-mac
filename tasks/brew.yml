@@ -1,0 +1,70 @@
+---
+- name: Add user to admin group
+  ansible.builtin.user:
+    name: "{{ username }}"
+    state: present
+    groups: admin
+    append: true
+  become: true
+
+- name: Enable passwordless sudo for "{{ username }}"
+  ansible.builtin.lineinfile:
+    dest: /etc/sudoers
+    regexp: "^%wheel"
+    line: "{{ username }} ALL=(ALL) NOPASSWD: ALL"
+    validate: "/usr/sbin/visudo -cf %s"
+    state: present
+  become: true
+
+- name: Ensure Homebrew is installed
+  ansible.builtin.stat:
+    path: /opt/homebrew/bin/brew
+  register: brew_check
+
+- name: Install Homebrew
+  shell: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" < /dev/null
+  when: not brew_check.stat.exists
+  changed_when: not brew_check.stat.exists
+  # https://stackoverflow.com/questions/25128546/how-to-automate-homebrew-installation
+
+- name: Check if Homebrew shellenv exists in .zprofile
+  ansible.builtin.command: grep -c "brew shellenv" "/Users/{{ username }}/.zprofile"
+  register: shellenv_check
+  changed_when: false
+  failed_when: false
+
+- name: Add Homebrew to PATH in .zprofile
+  ansible.builtin.lineinfile:
+    path: "/Users/{{ username }}/.zprofile"
+    line: 'eval "$(/opt/homebrew/bin/brew shellenv)"'
+    create: true
+  when: shellenv_check.rc != 0 or shellenv_check.stdout == "0"
+
+- name: Update homebrew
+  homebrew:
+    update_homebrew: yes
+    upgrade_all: yes
+  when: brew_check.stat.exists
+
+- name: Add Homebrew taps
+  homebrew_tap:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ taps }}"
+
+- name: Install Homebrew packages
+  homebrew:
+    name: "{{ item }}"
+    state: latest
+  loop: "{{ packages }}"
+
+
+- name: Install packages from taps
+  homebrew:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ tap_packages }}"
+  register: tap_result
+  failed_when:
+    - tap_result is failed
+    - not "already an App at" in tap_result.msg | default('')

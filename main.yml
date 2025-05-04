@@ -1,0 +1,42 @@
+---
+- name: Configure macOS
+  hosts: test
+
+  pre_tasks:
+    - name: "Verifying Playbook requirements"
+      tags: ["always"]
+      block:
+        - name: Check target is running macOS.
+          assert:
+            that: "ansible_distribution == 'MacOSX'"
+            msg: "The target system is not running macOS"
+
+        - name: Check macOS version.
+          assert:
+            that: "ansible_distribution_version is version_compare('12', '>=')"
+            msg: "The target system must be running macOS 12 (Monterey) or higher to use this version of macOS-ansible."
+
+  tasks:
+    - import_tasks: tasks/brew.yml
+      when: configure_brew
+      tags: ["brew"]
+
+    - import_tasks: tasks/dotfiles.yml
+      when: configure_dotfiles
+      tags: ["dotfiles"]
+
+    - import_tasks: tasks/finder.yml
+      when: configure_finder
+      tags: ["finder"]
+
+    - import_tasks: tasks/dock.yml
+      when: configure_dock
+      tags: ["dock"]
+
+    - import_tasks: tasks/keys.yml
+      when: configure_keys
+      tags: ["keys"]
+
+    - import_tasks: tasks/ui.yml
+      when: configure_ui
+      tags: ["ui"]

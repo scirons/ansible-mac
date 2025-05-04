@@ -1,0 +1,5 @@
+[local]
+localhost ansible_connection=local
+
+[test]
+vm-test ansible_host=192.168.64.5 ansible_user=scirons ansible_connection=ssh

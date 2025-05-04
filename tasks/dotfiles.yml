@@ -1,0 +1,53 @@
+---
+- name: Ensure stow is installed
+  homebrew:
+    name: stow
+    state: present
+    update_homebrew: true
+
+- name: Ensure .config directory exists
+  file:
+    path: "{{ ansible_env.HOME }}/.config"
+    state: directory
+    mode: '0755'
+
+- name: Clone dotfiles repository locally
+  ansible.builtin.git:
+    repo: "{{ dotfiles_repo }}"
+    dest: "~/.dotfiles"
+    version: master
+    force: true
+
+- name: Stow zsh to home directory
+  command: /opt/homebrew/bin/stow --adopt --verbose --dir={{ ansible_env.HOME }}/.dotfiles --target={{ ansible_env.HOME }} zsh
+  args:
+    chdir: "{{ ansible_env.HOME }}"
+
+- name: Stow aerospace to home directory
+  command: /opt/homebrew/bin/stow --adopt --verbose --dir={{ ansible_env.HOME }}/.dotfiles --target={{ ansible_env.HOME }} aerospace
+  args:
+    chdir: "{{ ansible_env.HOME }}"
+
+- name: Find directories in dotfiles repo
+  find:
+    paths: "{{ ansible_env.HOME }}/.dotfiles"
+    file_type: directory
+    recurse: no
+    excludes: [".git"]
+  register: dotfiles_dirs
+
+- name: Create parent directories for stow targets
+  file:
+    path: "{{ ansible_env.HOME }}/.config/{{ item.path | basename }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ dotfiles_dirs.files }}"
+
+- name: Stow dotfiles to specific .config subdirectories
+  command: >
+    /opt/homebrew/bin/stow --verbose
+    --dir={{ ansible_env.HOME }}/.dotfiles
+    --target={{ ansible_env.HOME }}/.config/{{ item.path | basename }}
+    --no-folding
+    -S {{ item.path | basename }}
+  loop: "{{ dotfiles_dirs.files }}"
