@@ -57,7 +57,8 @@
     name: "{{ item }}"
     state: latest
   loop: "{{ packages }}"
-
+  register: install_result
+  failed_when: install_result.failed and ('Error' in install_result.msg or 'error' in install_result.msg)
 
 - name: Install packages from taps
   homebrew:
@@ -65,6 +66,4 @@
     state: present
   loop: "{{ tap_packages }}"
   register: tap_result
-  failed_when:
-    - tap_result is failed
-    - not "already an App at" in tap_result.msg | default('')
+  ignore_errors: true
